@@ -1,4 +1,7 @@
-use solana_program::program_error::ProgramError;
+use solana_program::{
+    program_error::ProgramError,
+    // msg,
+};
 use std::convert::TryInto;
 
 use crate::error::BankError;
@@ -6,11 +9,11 @@ use crate::error::BankError;
 pub enum BankInstruction {
     Deposit {
         amount: u64,
-        proof: String,
+        note: String,
     },
     Withdraw {
         amount: u64,
-        proof: String,
+        note: String,
     },
 }
 
@@ -21,11 +24,11 @@ impl BankInstruction {
         Ok(match tag {
             0=> Self::Deposit {
                 amount: Self::unpack_amount(rest)?,
-                proof: Self::unpack_proof(rest)?,
+                note: Self::unpack_note(rest)?,
             },
             1 => Self::Withdraw {
                 amount: Self::unpack_amount(rest)?,
-                proof: Self::unpack_proof(rest)?,
+                note: Self::unpack_note(rest)?,
             },
             _=>return Err(BankError::InvalidInstruction.into())
         })
@@ -41,14 +44,16 @@ impl BankInstruction {
         Ok(amount)
     }
 
-    fn unpack_proof(input: &[u8]) -> Result<String, ProgramError> {
-        let buf = input.get(9..17).ok_or(BankError::InvalidInstruction)?;
+    fn unpack_note(input: &[u8]) -> Result<String, ProgramError> {
+        let note_len = 12;
+        let note_end = note_len + 8;
+        let buf = input.get(8..note_end).ok_or(BankError::InvalidInstruction)?;
 
-        let proof = match String::from_utf8(buf.to_vec()) {
+        let note = match String::from_utf8(buf.to_vec()) {
             Ok(v) => v,
             Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
         };
 
-        Ok(proof)
+        Ok(note)
     }
 }

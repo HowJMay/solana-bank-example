@@ -1,9 +1,15 @@
 {
+  "extends": "@tsconfig/recommended/tsconfig.json",
+  "ts-node": {
+    "compilerOptions": {
+      "module": "commonjs"
+    }
+  },
   "compilerOptions": {
-      "rootDir": "./src",
-      "outDir": "./build",
-      "lib": ["ESNext"],
-      "strict": true,
-      "skipLibCheck": true
-  }
+    "declaration": true,
+    "moduleResolution": "node",
+    "module": "es2015"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
 }

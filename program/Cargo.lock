@@ -673,6 +673,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "solana-bank-example"
+version = "0.1.0"
+dependencies = [
+ "solana-program",
+ "thiserror",
+]
+
+[[package]]
 name = "solana-frozen-abi"
 version = "1.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -763,14 +771,6 @@ dependencies = [
  "quote",
  "rustversion",
  "syn",
-]
-
-[[package]]
-name = "solana-test"
-version = "0.1.0"
-dependencies = [
- "solana-program",
- "thiserror",
 ]
 
 [[package]]

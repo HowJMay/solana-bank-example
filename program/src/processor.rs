@@ -1,5 +1,5 @@
 use solana_program::{
-    account_info::{AccountInfo},
+    account_info::{next_account_info, AccountInfo},
     entrypoint::ProgramResult,
     msg,
     // program::{invoke, invoke_signed},
@@ -20,16 +20,20 @@ impl Processor {
     ) -> ProgramResult {
         let instruction = BankInstruction::unpack(instruction_data)?;
 
+        let account_info_iter = &mut accounts.iter();
+        let money_receiver = next_account_info(account_info_iter)?;
+        msg!("money_receiver = {}", *money_receiver.key);
+
         match instruction {
-            BankInstruction::Deposit {amount, proof} => {
-                msg!("Instruction: Deposit");
-                msg!("{}", proof);
+            BankInstruction::Deposit {amount, note} => {
+                msg!("Instruction: Deposit, amount: {}", amount);
+                msg!("note: {}", note);
                 Self::process_deposit(program_id, accounts, amount)
             }
 
-            BankInstruction::Withdraw {amount, proof} => {
-                msg!("Instruction: Withdraw");
-                msg!("{}", proof);
+            BankInstruction::Withdraw {amount, note} => {
+                msg!("Instruction: Withdraw, amount: {}", amount);
+                msg!("note: {}", note);
                 Self::process_withdraw(program_id, accounts, amount)
             }
         }

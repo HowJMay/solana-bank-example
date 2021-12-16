@@ -1,5 +1,5 @@
 [package]
-name = "solana-test"
+name = "solana-bank-example"
 version = "0.1.0"
 edition = "2018"
 

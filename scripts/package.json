@@ -1,34 +1,45 @@
 {
-  "name": "escrow-scripts",
+  "name": "solana-bank-example",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
-  "scripts": {
-    "compile": "tsc -p ./tsconfig.json",
-    "setup-validator": "solana-test-validator -r --mint E2F3fsS1HpsLb2VpEgsA5ztfo83CWFWW4jWpC6FvJ6qR --bpf-program 4yBTZXsuz7c1X3PJF4PPCJr8G6HnNAgRvzAWVoFZMncH",
-    "setup": "npm run compile && node build/setup.js",
-    "setup-alice": "npm run compile && node build/setup.js && node build/alice.js",
-    "alice": "npm run compile && node build/alice.js",
-    "bob": "npm run compile && node build/bob.js",
-    "alice-bob": "npm run compile && node build/alice.js && node build/bob.js",
-    "all": "npm run compile && node build/setup.js && node build/alice.js && node build/bob.js"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HowJMay/solana-bank-example"
   },
+  "keywords": [],
   "author": "",
-  "license": "ISC",
-  "devDependencies": {
-    "@types/bs58": "^4.0.1",
-    "@typescript-eslint/eslint-plugin": "^4.31.2",
-    "@typescript-eslint/parser": "^4.31.2",
-    "eslint": "^7.32.0",
-    "eslint-config-prettier": "^8.3.0",
-    "eslint-plugin-prettier": "^4.0.0",
-    "eslint-plugin-unused-imports": "^1.1.5",
-    "prettier": "^2.4.1",
-    "typescript": "^4.4.3"
+  "license": "MIT",
+  "scripts": {
+    "start": "ts-node src/main.ts",
+    "start-with-test-validator": "start-server-and-test 'solana-test-validator --reset --quiet' http://localhost:8899/health start",
+    "pretty": "prettier --write '{,src/**/}*.ts'"
   },
   "dependencies": {
-    "@solana/spl-token": "^0.1.8",
-    "@solana/web3.js": "^1.29.1",
-    "bn.js": "^5.2.0"
+    "@solana/web3.js": "^1.7.0",
+    "borsh": "^0.6.0",
+    "mz": "^2.7.0",
+    "path": "^0.12.7",
+    "resolve-path": "^1.4.0",
+    "yaml": "^1.10.2"
+  },
+  "devDependencies": {
+    "@tsconfig/recommended": "^1.0.1",
+    "@types/eslint": "^7.2.4",
+    "@types/eslint-plugin-prettier": "^3.1.0",
+    "@types/mz": "^2.7.2",
+    "@types/prettier": "^2.1.5",
+    "@types/yaml": "^1.9.7",
+    "@typescript-eslint/eslint-plugin": "^4.6.0",
+    "@typescript-eslint/parser": "^4.6.0",
+    "eslint": "^7.12.1",
+    "eslint-config-prettier": "^6.15.0",
+    "eslint-plugin-prettier": "^4.0.0",
+    "prettier": "^2.1.2",
+    "start-server-and-test": "^1.11.6",
+    "ts-node": "^10.0.0",
+    "typescript": "^4.0.5"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 }

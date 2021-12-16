@@ -1,87 +1,64 @@
-import { Connection, Keypair, PublicKey } from "@solana/web3.js";
-//@ts-expect-error missing types
-import * as BufferLayout from "buffer-layout";
+import os from 'os';
+import fs from 'mz/fs';
+import path from 'path';
+import yaml from 'yaml';
+import {Keypair} from '@solana/web3.js';
 
-import * as fs from "fs";
-
-export const logError = (msg: string) => {
-  console.log(`\x1b[31m${msg}\x1b[0m`);
-};
-
-export const writePublicKey = (publicKey: PublicKey, name: string) => {
-  fs.writeFileSync(
-    `./keys/${name}_pub.json`,
-    JSON.stringify(publicKey.toString())
+/**
+ * @private
+ */
+async function get_config(): Promise<any> {
+  // Path to Solana CLI config file
+  const CONFIG_FILE_PATH = path.resolve(
+    os.homedir(),
+    '.config',
+    'solana',
+    'cli',
+    'config.yml',
   );
-};
+  const configYml = await fs.readFile(CONFIG_FILE_PATH, {encoding: 'utf8'});
+  return yaml.parse(configYml);
+}
 
-export const getPublicKey = (name: string) =>
-  new PublicKey(
-    JSON.parse(fs.readFileSync(`./keys/${name}_pub.json`) as unknown as string)
-  );
-
-export const getPrivateKey = (name: string) =>
-  Uint8Array.from(
-    JSON.parse(fs.readFileSync(`./keys/${name}.json`) as unknown as string)
-  );
-
-export const getKeypair = (name: string) =>
-  new Keypair({
-    publicKey: getPublicKey(name).toBytes(),
-    secretKey: getPrivateKey(name),
-  });
-
-export const getProgramId = () => {
+/**
+ * Load and parse the Solana CLI config file to determine which RPC url to use
+ */
+export async function get_rpc_url(): Promise<string> {
   try {
-    return getPublicKey("program");
-  } catch (e) {
-    logError("Given programId is missing or incorrect");
-    process.exit(1);
+    const config = await get_config();
+    if (!config.json_rpc_url) throw new Error('Missing RPC URL');
+    return config.json_rpc_url;
+  } catch (err) {
+    console.warn(
+      'Failed to read RPC url from CLI config file, falling back to localhost',
+    );
+    return 'http://localhost:8899';
   }
-};
-
-export const getTerms = (): {
-  aliceExpectedAmount: number;
-  bobExpectedAmount: number;
-} => {
-  return JSON.parse(fs.readFileSync(`./terms.json`) as unknown as string);
-};
-
-export const getTokenBalance = async (
-  pubkey: PublicKey,
-  connection: Connection
-) => {
-  return parseInt(
-    (await connection.getTokenAccountBalance(pubkey)).value.amount
-  );
-};
+}
 
 /**
- * Layout for a public key
+ * Load and parse the Solana CLI config file to determine which payer to use
  */
-const publicKey = (property = "publicKey") => {
-  return BufferLayout.blob(32, property);
-};
+export async function get_payer(): Promise<Keypair> {
+  try {
+    const config = await get_config();
+    if (!config.keypair_path) throw new Error('Missing keypair path');
+    return await create_keypair_from_file(config.keypair_path);
+  } catch (err) {
+    console.warn(
+      'Failed to create keypair from CLI config file, falling back to new random keypair',
+    );
+    return Keypair.generate();
+  }
+}
 
 /**
- * Layout for a 64bit unsigned value
+ * Create a Keypair from a secret key stored in file as bytes' array
  */
-const uint64 = (property = "uint64") => {
-  return BufferLayout.blob(8, property);
-};
-
-export const ESCROW_ACCOUNT_DATA_LAYOUT = BufferLayout.struct([
-  BufferLayout.u8("isInitialized"),
-  publicKey("initializerPubkey"),
-  publicKey("initializerTempTokenAccountPubkey"),
-  publicKey("initializerReceivingTokenAccountPubkey"),
-  uint64("expectedAmount"),
-]);
-
-export interface EscrowLayout {
-  isInitialized: number;
-  initializerPubkey: Uint8Array;
-  initializerReceivingTokenAccountPubkey: Uint8Array;
-  initializerTempTokenAccountPubkey: Uint8Array;
-  expectedAmount: Uint8Array;
+export async function create_keypair_from_file(
+  filePath: string,
+): Promise<Keypair> {
+  const secret_key_string = await fs.readFile(filePath, {encoding: 'utf8'});
+  const secret_key = Uint8Array.from(JSON.parse(secret_key_string));
+  return Keypair.fromSecretKey(secret_key);
 }
