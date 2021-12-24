@@ -31,7 +31,8 @@ let connection: Connection;
 /**
  * Keypair associated to the fees' payer
  */
-let payer: Keypair;
+let deposit_payer: Keypair;
+let withdraw_payer: Keypair;
 
 /**
  * Bank's program id
@@ -108,9 +109,9 @@ export async function establish_connection(): Promise<void> {
 /**
  * Establish an account to pay for everything
  */
-export async function establish_payer(): Promise<void> {
+export async function establish_deposit_payer(): Promise<void> {
   let fees = 0;
-  if (!payer) {
+  if (!deposit_payer) {
     const { feeCalculator } = await connection.getRecentBlockhash();
 
     // Calculate the cost to fund the money reciever account
@@ -121,26 +122,62 @@ export async function establish_payer(): Promise<void> {
     // Calculate the cost of sending transactions
     fees += feeCalculator.lamportsPerSignature * 100; // wag
 
-    payer = await get_payer();
+    deposit_payer = await get_payer();
   }
 
-  let lamports = await connection.getBalance(payer.publicKey);
+  let lamports = await connection.getBalance(deposit_payer.publicKey);
   if (lamports < fees) {
     // If current balance is not enough to pay for fees, request an airdrop
     const sig = await connection.requestAirdrop(
-      payer.publicKey,
+      deposit_payer.publicKey,
       fees - lamports
     );
     await connection.confirmTransaction(sig);
-    lamports = await connection.getBalance(payer.publicKey);
+    lamports = await connection.getBalance(deposit_payer.publicKey);
   }
 
   console.log(
     "Using account",
-    payer.publicKey.toBase58(),
+    deposit_payer.publicKey.toBase58(),
     "containing",
     lamports / LAMPORTS_PER_SOL,
-    "SOL to pay for fees"
+    "SOL to pay for depositing fees"
+  );
+}
+
+export async function establish_withdraw_payer(): Promise<void> {
+  let fees = 0;
+  if (!withdraw_payer) {
+    const { feeCalculator } = await connection.getRecentBlockhash();
+
+    // Calculate the cost to fund the money reciever account
+    fees += await connection.getMinimumBalanceForRentExemption(
+      MONEY_RECEIVER_ACCOUNT_SIZE
+    );
+
+    // Calculate the cost of sending transactions
+    fees += feeCalculator.lamportsPerSignature * 100; // wag
+
+    withdraw_payer = await get_payer();
+  }
+
+  let lamports = await connection.getBalance(withdraw_payer.publicKey);
+  if (lamports < fees) {
+    // If current balance is not enough to pay for fees, request an airdrop
+    const sig = await connection.requestAirdrop(
+      withdraw_payer.publicKey,
+      fees - lamports
+    );
+    await connection.confirmTransaction(sig);
+    lamports = await connection.getBalance(withdraw_payer.publicKey);
+  }
+
+  console.log(
+    "Using account",
+    withdraw_payer.publicKey.toBase58(),
+    "containing",
+    lamports / LAMPORTS_PER_SOL,
+    "SOL to pay for withdrawing fees"
   );
 }
 
@@ -180,7 +217,7 @@ export async function check_program(): Promise<void> {
   // Derive the address (public key) of a money reciever account from the program so that it's easy to find later.
   const MONEY_RECEIVED_SEED = "I want money";
   money_received_pubkey = await PublicKey.createWithSeed(
-    payer.publicKey,
+    deposit_payer.publicKey,
     MONEY_RECEIVED_SEED,
     program_id
   );
@@ -201,8 +238,8 @@ export async function check_program(): Promise<void> {
 
     const transaction = new Transaction().add(
       SystemProgram.createAccountWithSeed({
-        fromPubkey: payer.publicKey,
-        basePubkey: payer.publicKey,
+        fromPubkey: deposit_payer.publicKey,
+        basePubkey: deposit_payer.publicKey,
         seed: MONEY_RECEIVED_SEED,
         newAccountPubkey: money_received_pubkey,
         lamports,
@@ -210,7 +247,7 @@ export async function check_program(): Promise<void> {
         programId: program_id,
       })
     );
-    await sendAndConfirmTransaction(connection, transaction, [payer]);
+    await sendAndConfirmTransaction(connection, transaction, [deposit_payer]);
   }
 }
 
@@ -229,14 +266,14 @@ export async function deposit_token(): Promise<void> {
     lamports: await connection.getMinimumBalanceForRentExemption(
       AccountLayout.span
     ) +deposit_amount ,
-    fromPubkey: payer.publicKey,
+    fromPubkey: deposit_payer.publicKey,
     newAccountPubkey: deposit_account.publicKey,
   });
   const init_wrapped_native_account_instruction = Token.createInitAccountInstruction(
     TOKEN_PROGRAM_ID,
     NATIVE_MINT,
     deposit_account.publicKey,
-    payer.publicKey
+    deposit_payer.publicKey
   );
 
   // trigger othe operations
@@ -247,7 +284,7 @@ export async function deposit_token(): Promise<void> {
     keys: [
       { pubkey: money_received_pubkey, isSigner: false, isWritable: true },
       { pubkey: deposit_account.publicKey, isSigner: false, isWritable: true },
-      { pubkey: payer.publicKey, isSigner: true, isWritable: false },
+      { pubkey: deposit_payer.publicKey, isSigner: true, isWritable: false },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
     ],
@@ -263,10 +300,10 @@ export async function deposit_token(): Promise<void> {
       create_wrapped_native_account_instruction,
       init_wrapped_native_account_instruction,
     ),
-    [payer, deposit_account]
+    [deposit_payer, deposit_account]
   );
   
-  const token = new Token(connection, NATIVE_MINT, TOKEN_PROGRAM_ID, payer);
+  const token = new Token(connection, NATIVE_MINT, TOKEN_PROGRAM_ID, deposit_payer);
   let deposit_account_info_before = await token.getAccountInfo(deposit_account.publicKey);
   console.log("deposit_account_info_before: ", deposit_account_info_before.amount)
   
@@ -275,7 +312,7 @@ export async function deposit_token(): Promise<void> {
     new Transaction().add(
       instruction,
     ),
-    [payer]
+    [deposit_payer]
   );
 
   let deposit_account_info_after = await token.getAccountInfo(deposit_account.publicKey);
@@ -294,20 +331,36 @@ export async function deposit_token(): Promise<void> {
     lamports: await connection.getMinimumBalanceForRentExemption(
       AccountLayout.span
     ) ,
-    fromPubkey: payer.publicKey,
+    fromPubkey: deposit_payer.publicKey,
     newAccountPubkey: withdraw_account.publicKey,
   });
   const init_wrapped_native_account_instruction = Token.createInitAccountInstruction(
     TOKEN_PROGRAM_ID,
     NATIVE_MINT,
     withdraw_account.publicKey,
-    payer.publicKey
+    deposit_payer.publicKey
   );
 
   const PDA = await PublicKey.findProgramAddress(
     [Buffer.from("bank store")],
     program_id,
   );
+
+  var signature = await sendAndConfirmTransaction(
+    connection,
+    new Transaction().add(
+      create_wrapped_native_account_instruction,
+      init_wrapped_native_account_instruction,
+    ),
+    [deposit_payer, withdraw_account]
+  );
+
+  const token = new Token(connection, NATIVE_MINT, TOKEN_PROGRAM_ID, deposit_payer);
+  let deposit_account_info_before = await token.getAccountInfo(deposit_account.publicKey);
+  console.log("deposit_account_info_before: ", deposit_account_info_before.amount)
+  let withdraw_account_info_before = await token.getAccountInfo(withdraw_account.publicKey);
+  console.log("withdraw_account_info_before: ", withdraw_account_info_before.amount)
+  
 
   // trigger othe operations
   var withdraw_amount_big_number = new BN(withdraw_amount).toArray("le", 8);
@@ -326,28 +379,12 @@ export async function deposit_token(): Promise<void> {
       Uint8Array.of(1, ...withdraw_amount_big_number, ...withdraw_note)
     ),
   });
-
-  var signature = await sendAndConfirmTransaction(
-    connection,
-    new Transaction().add(
-      create_wrapped_native_account_instruction,
-      init_wrapped_native_account_instruction,
-    ),
-    [payer, withdraw_account]
-  );
-
-  const token = new Token(connection, NATIVE_MINT, TOKEN_PROGRAM_ID, payer);
-  let deposit_account_info_before = await token.getAccountInfo(deposit_account.publicKey);
-  console.log("deposit_account_info_before: ", deposit_account_info_before.amount)
-  let withdraw_account_info_before = await token.getAccountInfo(withdraw_account.publicKey);
-  console.log("withdraw_account_info_before: ", withdraw_account_info_before.amount)
-  
   var signature = await sendAndConfirmTransaction(
     connection,
     new Transaction().add(
       instruction,
     ),
-    [payer]
+    [withdraw_payer],
   );
   
   let deposit_account_info_after = await token.getAccountInfo(deposit_account.publicKey);

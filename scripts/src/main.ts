@@ -1,9 +1,9 @@
 import {
   establish_connection,
-  establish_payer,
+  establish_deposit_payer,
+  establish_withdraw_payer,
   check_program,
   deposit_token,
-  report_received_note,
   withdraw_token,
 } from './client';
 
@@ -14,7 +14,8 @@ async function main() {
   await establish_connection();
 
   // Determine who pays for the fees
-  await establish_payer();
+  await establish_deposit_payer();
+  await establish_withdraw_payer();
 
   // Check if the program has been deployed
   await check_program();
