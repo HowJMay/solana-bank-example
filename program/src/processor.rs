@@ -3,8 +3,6 @@ use solana_program::{
     entrypoint::ProgramResult,
     msg,
     program::{invoke, invoke_signed},
-    // program_error::ProgramError,
-    // program_pack::{IsInitialized, Pack},
     pubkey::Pubkey,
     sysvar::{rent::Rent, Sysvar},
 };
@@ -45,13 +43,9 @@ impl Processor {
     ) -> ProgramResult {
         let account_info_iter = &mut _accounts.iter();
 
-        // only the `token_receiver` can withdraw this transaction
         let token_receiver = next_account_info(account_info_iter)?;
-        msg!("token_receiver = {}", *token_receiver.key);
-
         let deposited_account = next_account_info(account_info_iter)?;
         let payer = next_account_info(account_info_iter)?;
-        let system_program_info = next_account_info(account_info_iter)?;
         let token_program = next_account_info(account_info_iter)?;
         
         // check rent exempt
@@ -61,11 +55,11 @@ impl Processor {
         }
 
         // generate a PDA, the PDA is going to own all the input accounts which contain the credited token(money) 
-        let (pda, _nonce) = Pubkey::find_program_address(&[b"store_pda"], _program_id);
+        let (pda, _nonce) = Pubkey::find_program_address(&[b"bank store"], _program_id);
         
-        msg!("Calling the token program to transfer tokens to the escrow's initializer...");
+        msg!("Calling the token program to transfer ownership to the Bank program");
         // set authority to the PDA
-        let ownship_change = spl_token::instruction::set_authority(
+        let ownship_change_ix = spl_token::instruction::set_authority(
             token_program.key,
             deposited_account.key,
             Some(&pda),
@@ -75,7 +69,7 @@ impl Processor {
         )?;
 
         invoke(
-            &ownship_change,
+            &ownship_change_ix,
             &[
                 token_program.clone(),
                 deposited_account.clone(),
@@ -94,6 +88,42 @@ impl Processor {
         // check whether the note is valid
 
         // transmit money from PDA to receiver
+        let account_info_iter = &mut _accounts.iter();
+
+        let withdraw_account = next_account_info(account_info_iter)?;
+        let deposited_account = next_account_info(account_info_iter)?;
+        let pda_account = next_account_info(account_info_iter)?;
+        let token_program = next_account_info(account_info_iter)?;
+
+        // check rent exempt
+        let rent = &Rent::from_account_info(next_account_info(account_info_iter)?)?;
+        if !rent.is_exempt(withdraw_account.lamports(), withdraw_account.data_len()) {
+            return Err(BankError::NotRentExempt.into());
+        }
+
+        // generate a PDA, the PDA is going to own all the input accounts which contain the credited token(money) 
+        let (pda, _nonce) = Pubkey::find_program_address(&[b"bank store"], _program_id);
+        
+        msg!("transfer token to the token receiver");
+        let transfer_to_receiver_ix = spl_token::instruction::transfer(
+            token_program.key,
+            deposited_account.key,
+            withdraw_account.key,
+            &pda,
+            &[&pda],
+            _amount,
+        )?;
+        
+        invoke_signed(
+            &transfer_to_receiver_ix,
+            &[
+                token_program.clone(),
+                deposited_account.clone(),
+                withdraw_account.clone(),
+                pda_account.clone(),
+            ],
+            &[&[&b"bank store"[..], &[_nonce]]],
+        )?;
 
         Ok(())
     }

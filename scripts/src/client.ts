@@ -217,19 +217,26 @@ export async function check_program(): Promise<void> {
 /**
  * Deposit token
  */
+// declare var deposit_account: Keypair;
+var deposit_account = new Keypair();
 export async function deposit_token(): Promise<void> {
-  console.log("deposit money to", money_received_pubkey.toBase58());
-  var deposit_amount = 10;
+  var deposit_amount = 12;
 
-  // transfer money to the sub-account
-  const owner = Keypair.generate();
-  const deposited_account_pubkey = await Token.createWrappedNativeAccount(
-    connection,
+  // var deposit_account = new Keypair()
+  const create_wrapped_native_account_instruction = SystemProgram.createAccount({
+    programId: TOKEN_PROGRAM_ID,
+    space: AccountLayout.span,
+    lamports: await connection.getMinimumBalanceForRentExemption(
+      AccountLayout.span
+    ) +deposit_amount ,
+    fromPubkey: payer.publicKey,
+    newAccountPubkey: deposit_account.publicKey,
+  });
+  const init_wrapped_native_account_instruction = Token.createInitAccountInstruction(
     TOKEN_PROGRAM_ID,
-    payer.publicKey,
-    payer,
-    (await connection.getMinimumBalanceForRentExemption(AccountLayout.span)) +
-      deposit_amount
+    NATIVE_MINT,
+    deposit_account.publicKey,
+    payer.publicKey
   );
 
   // trigger othe operations
@@ -239,9 +246,8 @@ export async function deposit_token(): Promise<void> {
   const instruction = new TransactionInstruction({
     keys: [
       { pubkey: money_received_pubkey, isSigner: false, isWritable: true },
-      { pubkey: deposited_account_pubkey, isSigner: false, isWritable: true },
+      { pubkey: deposit_account.publicKey, isSigner: false, isWritable: true },
       { pubkey: payer.publicKey, isSigner: true, isWritable: false },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
     ],
@@ -251,13 +257,103 @@ export async function deposit_token(): Promise<void> {
     ),
   });
 
-  var signature = await sendAndConfirmTransaction(
+  await sendAndConfirmTransaction(
     connection,
-    new Transaction().add(instruction),
+    new Transaction().add(
+      create_wrapped_native_account_instruction,
+      init_wrapped_native_account_instruction,
+    ),
+    [payer, deposit_account]
+  );
+  
+  const token = new Token(connection, NATIVE_MINT, TOKEN_PROGRAM_ID, payer);
+  let deposit_account_info_before = await token.getAccountInfo(deposit_account.publicKey);
+  console.log("deposit_account_info_before: ", deposit_account_info_before.amount)
+  
+  await sendAndConfirmTransaction(
+    connection,
+    new Transaction().add(
+      instruction,
+    ),
     [payer]
   );
 
-  console.log("SUCCESS===========");
+  let deposit_account_info_after = await token.getAccountInfo(deposit_account.publicKey);
+  console.log("deposit_account_info_after: ", deposit_account_info_after.amount)
+}
+
+/**
+ * Withdraw token
+ */
+ export async function withdraw_token(): Promise<void> {
+  var withdraw_amount = 11
+  var withdraw_account = new Keypair()
+  const create_wrapped_native_account_instruction = SystemProgram.createAccount({
+    programId: TOKEN_PROGRAM_ID,
+    space: AccountLayout.span,
+    lamports: await connection.getMinimumBalanceForRentExemption(
+      AccountLayout.span
+    ) ,
+    fromPubkey: payer.publicKey,
+    newAccountPubkey: withdraw_account.publicKey,
+  });
+  const init_wrapped_native_account_instruction = Token.createInitAccountInstruction(
+    TOKEN_PROGRAM_ID,
+    NATIVE_MINT,
+    withdraw_account.publicKey,
+    payer.publicKey
+  );
+
+  const PDA = await PublicKey.findProgramAddress(
+    [Buffer.from("bank store")],
+    program_id,
+  );
+
+  // trigger othe operations
+  var withdraw_amount_big_number = new BN(withdraw_amount).toArray("le", 8);
+  var enc = new TextEncoder();
+  var withdraw_note = enc.encode("withdraw note");
+  const instruction = new TransactionInstruction({
+    keys: [
+      { pubkey: withdraw_account.publicKey, isSigner: false, isWritable: true },
+      { pubkey: deposit_account.publicKey, isSigner: false, isWritable: true},
+      { pubkey: PDA[0], isSigner: false, isWritable: false },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+    ],
+    programId: program_id,
+    data: Buffer.from(
+      Uint8Array.of(1, ...withdraw_amount_big_number, ...withdraw_note)
+    ),
+  });
+
+  var signature = await sendAndConfirmTransaction(
+    connection,
+    new Transaction().add(
+      create_wrapped_native_account_instruction,
+      init_wrapped_native_account_instruction,
+    ),
+    [payer, withdraw_account]
+  );
+
+  const token = new Token(connection, NATIVE_MINT, TOKEN_PROGRAM_ID, payer);
+  let deposit_account_info_before = await token.getAccountInfo(deposit_account.publicKey);
+  console.log("deposit_account_info_before: ", deposit_account_info_before.amount)
+  let withdraw_account_info_before = await token.getAccountInfo(withdraw_account.publicKey);
+  console.log("withdraw_account_info_before: ", withdraw_account_info_before.amount)
+  
+  var signature = await sendAndConfirmTransaction(
+    connection,
+    new Transaction().add(
+      instruction,
+    ),
+    [payer]
+  );
+  
+  let deposit_account_info_after = await token.getAccountInfo(deposit_account.publicKey);
+  console.log("deposit_account_info_after: ", deposit_account_info_after.amount)
+  let withdraw_account_info_after = await token.getAccountInfo(withdraw_account.publicKey);
+  console.log("withdraw_account_info_after: ", withdraw_account_info_after.amount)
 }
 
 /**

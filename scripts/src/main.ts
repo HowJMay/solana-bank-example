@@ -4,6 +4,7 @@ import {
   check_program,
   deposit_token,
   report_received_note,
+  withdraw_token,
 } from './client';
 
 async function main() {
@@ -20,11 +21,19 @@ async function main() {
 
   // Deposit money
   await deposit_token();
+  console.log('=======================================================');
+  console.log('====================finish  deposit====================');
+  console.log('=======================================================');
 
-  // Demonstrate the recieved note
-  await report_received_note();
+  await withdraw_token();
+  console.log('=======================================================');
+  console.log('====================finish withdraw====================');
+  console.log('=======================================================');
 
-  console.log('Success');
+  // // Demonstrate the recieved note
+  // await report_received_note();
+
+  console.log('SUCCESS');
 }
 
 main().then(

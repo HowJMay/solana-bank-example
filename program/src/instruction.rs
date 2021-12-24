@@ -1,6 +1,5 @@
 use solana_program::{
     program_error::ProgramError,
-    msg,
 };
 use std::convert::TryInto;
 
