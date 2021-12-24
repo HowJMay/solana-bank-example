@@ -1,6 +1,6 @@
 use solana_program::{
     program_error::ProgramError,
-    // msg,
+    msg,
 };
 use std::convert::TryInto;
 
@@ -20,7 +20,6 @@ pub enum BankInstruction {
 impl BankInstruction {
     pub fn unpack(input: &[u8]) -> Result<Self, ProgramError> {
         let (tag, rest) = input.split_first().ok_or(BankError::InvalidInstruction)?;
-
         Ok(match tag {
             0=> Self::Deposit {
                 amount: Self::unpack_amount(rest)?,
@@ -48,7 +47,6 @@ impl BankInstruction {
         let note_len = 12;
         let note_end = note_len + 8;
         let buf = input.get(8..note_end).ok_or(BankError::InvalidInstruction)?;
-
         let note = match String::from_utf8(buf.to_vec()) {
             Ok(v) => v,
             Err(e) => panic!("Invalid UTF-8 sequence: {}", e),

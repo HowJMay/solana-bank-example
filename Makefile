@@ -1,5 +1,6 @@
 build-program:
 	cd program && cargo build-bpf --manifest-path=Cargo.toml --bpf-out-dir=../dist/program
+
 deploy-program:
 	solana program deploy dist/program/solana_bank_example.so
 
